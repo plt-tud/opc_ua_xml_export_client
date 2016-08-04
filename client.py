@@ -6,6 +6,7 @@ import argparse
 import datetime
 
 def iterater_over_child_nodes(parent, namespace, nodes, visited):
+    # iterate over all referenced nodes (31)
     for child in parent.get_children(refs=31):
         if child not in visited:
             visited.append(child)
@@ -57,12 +58,17 @@ def create_node_xml(nodes, namespace, namespace_array, server_url, outputFile):
             pass
         try:
             # not tested
-            xml_ref.setAttribute("IsAbstract", str(node.is_abstract))
+            xml_ref.setAttribute("IsAbstract", str(node.IsAbstract))
         except:
             pass
         try:
             # not tested (Variable)
             xml_ref.setAttribute("DataType", node.get_data_type.to_str())
+        except:
+            pass
+        try:
+            # not tested (Variable)
+            xml_ref.setAttribute("Symmetric", str(node.isSymmetric))
         except:
             pass
         try:
@@ -86,13 +92,10 @@ def export_node_xml(server_url="opc.tcp://localhost:16664", namespace=None):
 
     print("Client connected to %s" % server_url)
 
-
-
     if not namespace:
         namespace = []
         for ns in client.get_namespace_array():
             namespace.append(client.get_namespace_index(ns))
-
 
     root = client.get_root_node()
 
