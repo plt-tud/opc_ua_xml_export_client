@@ -26,10 +26,16 @@ class NodeXMLExporter:
             if child not in self.nodes:
                 self.iterater_over_child_nodes(child)
 
-    def export_xml(self, output_file="export.xml"):
+    def export_xml(self, namespaces=None, output_file="export.xml"):
+        if namespaces:
+            self.logger.info("Export only NS %s" % namespaces)
+            nodes = [node for node in self.nodes if node.nodeid.NamespaceIndex in namespaces]
+        else:
+            nodes = self.nodes
+        
         self.logger.info("Export nodes to %s" % output_file)
         exp = XmlExporter(self.client)
-        exp.build_etree(self.nodes)
+        exp.build_etree(nodes)
         exp.write_xml(output_file)
         self.logger.info("Export finished")
 
@@ -37,8 +43,10 @@ class NodeXMLExporter:
         self.client = Client(server_url)
         try:
             self.client.connect()
-        except Exception:
-            self.logger.error("No connection established. Exiting ...")
+        except Exception as e:
+            self.logger.error("No connection established", e)
+            self.logger.error(e)
+            self.logger.error("Exiting ...")
             sys.exit()
 
         self.logger.info("Client connected to %s" % server_url)
@@ -47,7 +55,9 @@ class NodeXMLExporter:
             self.namespaces[self.client.get_namespace_index(ns)] = ns
 
         root = self.client.get_root_node()
+        self.logger.info("Starting to collect nodes. This may take some time ...")
         self.iterater_over_child_nodes(root)
+        self.logger.info("All nodes collected")
 
     def statistics(self):
         types = {}
@@ -79,7 +89,7 @@ if __name__ == "__main__":
                         dest="namespaces",
                         action="append",
                         type=int,
-                        help='Export only the given namespace index')
+                        help='Export only the given namespace indizes. Multiple NS indizes can be specified. If not specified, export all nodes.')
     parser.add_argument('outputFile',
                         help='Save exported nodes in specified XML file')
     args = parser.parse_args()
@@ -87,6 +97,6 @@ if __name__ == "__main__":
     exporter = NodeXMLExporter()
     exporter.import_nodes(server_url=args.serverUrl)
     exporter.statistics()
-    exporter.export_xml(args.outputFile)
+    exporter.export_xml(args.namespaces, args.outputFile)
 
     exporter.client.disconnect()
