@@ -29,7 +29,7 @@ class NodeXMLExporter:
     def export_xml(self, namespaces=None, output_file="export.xml"):
         if namespaces:
             self.logger.info("Export only NS %s" % namespaces)
-            nodes = [node for node in self.nodes if node.nodeid.NamespaceIndex in namespaces]
+            nodes = [node for node in  self.nodes if node.nodeid.NamespaceIndex in namespaces]
         else:
             nodes = self.nodes
         
@@ -40,7 +40,23 @@ class NodeXMLExporter:
         self.logger.info("Export finished")
 
     def import_nodes(self, server_url="opc.tcp://localhost:16664"):
+        from opcua.crypto import security_policies
+        import types
+        from opcua.ua.uaprotocol_hand import CryptographyNone
+        
         self.client = Client(server_url)
+        
+        # Fix symmetric_key_size (not 0) of securityPolicy
+        sec_policy = security_policies.SecurityPolicy()
+        sec_policy.symmetric_key_size = 8
+        self.client.security_policy = sec_policy
+        
+        # Fix signature method of CryptographyNone
+        def signature(self, data):
+            return None
+        fixed_signature = types.MethodType(signature, CryptographyNone)
+        self.client.security_policy.asymmetric_cryptography.signature = fixed_signature
+        
         try:
             self.client.connect()
         except Exception as e:
@@ -62,14 +78,17 @@ class NodeXMLExporter:
     def statistics(self):
         types = {}
         for node in self.nodes:
-            node_class = str(node.get_node_class())
-            ns = node.nodeid.NamespaceIndex
-            if ns not in types:
-                types[ns] = {}
-            if node_class not in types[ns]:
-                types[ns][node_class] = 1
-            else:
-                types[ns][node_class] += 1
+            try:
+                node_class = str(node.get_node_class())
+                ns = node.nodeid.NamespaceIndex
+                if ns not in types:
+                    types[ns] = {}
+                if node_class not in types[ns]:
+                    types[ns][node_class] = 1
+                else:
+                    types[ns][node_class] += 1
+            except Exception as e:
+                self.logger.info("some error with %s: %s" % (node,e))
 
         for ns in types:
             self.logger.info("NS%d (%s)" % (ns, self.namespaces[ns]))
