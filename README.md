@@ -6,13 +6,13 @@ This client exports all nodes from a running OPC UA server into a node XML file
 Dependencies
 ------------
 * Python3
-* freeopcua (https://github.com/FreeOpcUa/python-opcua)
+* opcua-asyncio (https://github.com/FreeOpcUa/opcua-asyncio)
 
 
 Install
 -------
 ```bash
-pip3 install freeopcua
+pip install asyncua
 ```
 
 
