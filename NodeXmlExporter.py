@@ -40,9 +40,9 @@ class NodeXMLExporter:
         self.logger.info("Export finished")
 
     async def import_nodes(self, server_url="opc.tcp://localhost:16664", username="", password=""):
-        from opcua.crypto import security_policies
+        from asyncua.crypto import security_policies
         import types
-        from opcua.ua.uaprotocol_hand import CryptographyNone
+        from asyncua.ua.uaprotocol_hand import CryptographyNone
         
         self.client = Client(server_url)
         
