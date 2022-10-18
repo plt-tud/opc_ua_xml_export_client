@@ -83,13 +83,18 @@ class XmlExporter(xmlexporter.XmlExporter):
         if rank != -1:
             el.attrib["ValueRank"] = str(int(rank))
         try:
-            dim = await node.read_attribute(ua.AttributeIds.ArrayDimensions)
+            dim = await node.read_array_dimensions() # read_attribute(ua.AttributeIds.ArrayDimensions)
             if dim.Value.Value:
                 el.attrib["ArrayDimensions"] = ",".join([str(i) for i in dim.Value.Value])
-        except:
+        except Exception as err:
+            #print(f"Getting array dimensions attribute exception {err=}, {type(err)=}")
             pass
-        el.attrib["DataType"] = dtype_name
-        await self.value_to_etree(el, dtype_name, dtype, node)
+        try:
+            el.attrib["DataType"] = dtype_name
+            await self.value_to_etree(el, dtype_name, dtype, node)
+        except Exception as err:
+            print(f"Getting value exception {err=}, {type(err)=}, node {node.nodeid}")
+            pass
        
     async def _add_node_common(self, nodetype, node):
         browsename = await node.read_browse_name()
