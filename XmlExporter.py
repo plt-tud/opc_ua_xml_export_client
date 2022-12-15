@@ -70,31 +70,6 @@ class XmlExporter(xmlexporter.XmlExporter):
                 if i != 0 and i not in idxs:
                     idxs.append(i)
         return idxs
-        
-        
-    async def add_variable_common(self, node, el):
-        dtype = await node.read_data_type()
-        if dtype.NamespaceIndex == 0 and dtype.Identifier in o_ids.ObjectIdNames:
-            dtype_name = o_ids.ObjectIdNames[dtype.Identifier]
-            self.aliases[dtype] = dtype_name
-        else:
-            dtype_name = self._node_to_string(dtype)
-        rank = await node.read_value_rank()
-        if rank != -1:
-            el.attrib["ValueRank"] = str(int(rank))
-        try:
-            dim = await node.read_array_dimensions() # read_attribute(ua.AttributeIds.ArrayDimensions)
-            if dim.Value.Value:
-                el.attrib["ArrayDimensions"] = ",".join([str(i) for i in dim.Value.Value])
-        except Exception as err:
-            #print(f"Getting array dimensions attribute exception {err=}, {type(err)=}")
-            pass
-        try:
-            el.attrib["DataType"] = dtype_name
-            await self.value_to_etree(el, dtype_name, dtype, node)
-        except Exception as err:
-            print(f"Getting value exception {err=}, {type(err)=}, node {node.nodeid}")
-            pass
        
     async def _add_node_common(self, nodetype, node):
         browsename = await node.read_browse_name()
