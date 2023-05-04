@@ -1,0 +1,21 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Nodeset XML Exporter",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/NodeXmlExporter.py",            
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "-s", "opc.tcp://localhost:53530/OPCUA/SimulationServer", //using the Prosys OPC UA Simulation Server
+                "-n", "6",
+                "-o", "export.ns2.xml",
+            ]
+        }
+    ]
+}

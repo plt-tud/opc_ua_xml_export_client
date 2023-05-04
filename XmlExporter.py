@@ -1,5 +1,4 @@
-from opcua.common import xmlexporter
-
+from asyncua.common import xmlexporter
 """
 Modified version of XmlExporter from FreeOPCUA
 
@@ -7,8 +6,7 @@ Add Try-Except
 """
 
 class XmlExporter(xmlexporter.XmlExporter):
-
-    def build_etree(self, node_list, uris=None):
+    async def build_etree(self, node_list):
         """
         Create an XML etree object from a list of nodes; custom namespace uris are optional
         Namespaces used by nodes are always exported for consistency.
@@ -20,19 +18,19 @@ class XmlExporter(xmlexporter.XmlExporter):
         """
         self.logger.info('Building XML etree')
 
-        self._add_namespaces(node_list, uris)
+        await self._add_namespaces(node_list)
 
         # add all nodes in the list to the XML etree
         for node in node_list:
             try:
-                self.node_to_etree(node)
+                await self.node_to_etree(node)
             except Exception as e:
                 self.logger.warn("Error building etree for node %s: %s" % (node, e))
 
         # add aliases to the XML etree
         self._add_alias_els()
         
-    def _get_ns_idxs_of_nodes(self, nodes):
+    async def _get_ns_idxs_of_nodes(self, nodes):
         """
         get a list of all indexes used or references by nodes
         """
@@ -44,7 +42,8 @@ class XmlExporter(xmlexporter.XmlExporter):
             except Exception:
                 pass
             try:
-                node_idxs.extend(ref.NodeId.NamespaceIndex for ref in node.get_references())
+                refs = await node.get_references()
+                node_idxs.extend(ref.NodeId.NamespaceIndex for ref in refs)
             except Exception:
                 pass
             node_idxs = list(set(node_idxs))  # remove duplicates
