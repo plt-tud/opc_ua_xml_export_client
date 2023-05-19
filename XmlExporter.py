@@ -25,6 +25,10 @@ Add Try-Except
 
 class XmlExporter(xmlexporter.XmlExporter):
 
+    def __init__(self, server, export_values: bool = False, progress_callback = ()):
+        super().__init__(server, export_values)
+        self.progress_callback = progress_callback
+
     async def build_etree(self, node_list):
         """
         Create an XML etree object from a list of nodes; custom namespace uris are optional
@@ -40,9 +44,12 @@ class XmlExporter(xmlexporter.XmlExporter):
         await self._add_namespaces(node_list)
 
         # add all nodes in the list to the XML etree
+        progress = 0
         for node in node_list:
             try:
                 await self.node_to_etree(node)
+                self.progress_callback(progress)
+                progress = progress + 1
             except Exception as e:
                 self.logger.warn("Error building etree for node %s: %s" % (node, e))
                 traceback.print_exc()

@@ -7,12 +7,13 @@ Dependencies
 ------------
 * Python3
 * opcua-asyncio v0.9.98 (https://github.com/FreeOpcUa/opcua-asyncio)
-
+* progressbar2 (https://pypi.org/project/progressbar2/)
 
 Install
 -------
 ```bash
 pip install asyncua
+pip install progressbar2
 ```
 
 
