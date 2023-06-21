@@ -6,13 +6,14 @@ This client exports all nodes from a running OPC UA server into a node XML file
 Dependencies
 ------------
 * Python3
-* freeopcua (https://github.com/FreeOpcUa/python-opcua)
-
+* opcua-asyncio v0.9.98 (https://github.com/FreeOpcUa/opcua-asyncio)
+* progressbar2 (https://pypi.org/project/progressbar2/)
 
 Install
 -------
 ```bash
-pip3 install freeopcua
+pip install asyncua
+pip install progressbar2
 ```
 
 
@@ -24,4 +25,7 @@ python3 NodeXmlExporter.py opc.tcp://localhost:16664 export.xml
 
 # Export only namespace 2
 python3 NodeXmlExporter.py opc.tcp://localhost:16664 --namespace 2 export-ns2.xml
+
+# Export with username/password
+python NodeXmlExporter.py opc.tcp://localhost:16664 --namespace 2 -u myusername -p somestrongpassword export-ns2.xml
 ```

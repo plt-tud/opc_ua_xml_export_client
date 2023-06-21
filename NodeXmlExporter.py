@@ -1,10 +1,11 @@
 #!/bin/bash/python3
-
+import asyncio
 import argparse
 import logging
 import sys
+import progressbar
 
-from opcua import Client
+from asyncua import Client
 
 from XmlExporter import XmlExporter
 
@@ -18,47 +19,59 @@ class NodeXMLExporter:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
-    def iterater_over_child_nodes(self, node):
+    async def start_node_browse(self, rootnode):
+        bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+        await self.iterater_over_child_nodes(rootnode, bar)
+
+    async def iterater_over_child_nodes(self, node, browse_progressbar):
         self.nodes.append(node)
         self.logger.debug("Add %s" % node)
+        browse_progressbar.update(len(self.nodes))
         # iterate over all referenced nodes (31), only hierarchical references (33)
-        for child in node.get_children(refs=33):
+        for child in await node.get_children(refs=33):
             if child not in self.nodes:
-                self.iterater_over_child_nodes(child)
+                await self.iterater_over_child_nodes(child, browse_progressbar)
 
-    def export_xml(self, namespaces=None, output_file="export.xml"):
+    async def export_xml(self, namespaces=None, output_file="export.xml", export_values=False):
         if namespaces:
             self.logger.info("Export only NS %s" % namespaces)
-            nodes = [node for node in  self.nodes if node.nodeid.NamespaceIndex in namespaces]
+            nodes = [node for node in self.nodes if node.nodeid.NamespaceIndex in namespaces]
         else:
             nodes = self.nodes
-        
+
         self.logger.info("Export nodes to %s" % output_file)
-        exp = XmlExporter(self.client)
-        exp.build_etree(nodes)
-        exp.write_xml(output_file)
+        self.logger.info("Export node values: %s" % export_values)
+        bar = progressbar.ProgressBar(max_value=len(nodes))
+        exp = XmlExporter(self.client, export_values, bar.update)
+        await exp.build_etree(nodes)
+        await exp.write_xml(output_file)
         self.logger.info("Export finished")
 
-    def import_nodes(self, server_url="opc.tcp://localhost:16664"):
-        from opcua.crypto import security_policies
+    async def import_nodes(self, server_url="opc.tcp://localhost:16664", username="", password=""):
+        from asyncua.crypto import security_policies
         import types
-        from opcua.ua.uaprotocol_hand import CryptographyNone
-        
+        from asyncua.ua.uaprotocol_hand import CryptographyNone
+
         self.client = Client(server_url)
-        
+        if username is not None:
+            self.client.set_user(username)
+
+        if password is not None:
+            self.client.set_password(password)
+
         # Fix symmetric_key_size (not 0) of securityPolicy
-        sec_policy = security_policies.SecurityPolicy()
-        sec_policy.symmetric_key_size = 8
-        self.client.security_policy = sec_policy
-        
+        # sec_policy = security_policies.SecurityPolicy()
+        # sec_policy.symmetric_key_size = 8
+        # self.client.security_policy = sec_policy
+
         # Fix signature method of CryptographyNone
-        def signature(self, data):
-            return None
-        fixed_signature = types.MethodType(signature, CryptographyNone)
-        self.client.security_policy.asymmetric_cryptography.signature = fixed_signature
-        
+        # def signature(self, data):
+        #    return None
+        # fixed_signature = types.MethodType(signature, CryptographyNone)
+        # self.client.security_policy.asymmetric_cryptography.signature = fixed_signature
+
         try:
-            self.client.connect()
+            await self.client.connect()
         except Exception as e:
             self.logger.error("No connection established", e)
             self.logger.error(e)
@@ -67,39 +80,41 @@ class NodeXMLExporter:
 
         self.logger.info("Client connected to %s" % server_url)
 
-        for ns in self.client.get_namespace_array():
-            self.namespaces[self.client.get_namespace_index(ns)] = ns
+        for ns in await self.client.get_namespace_array():
+            self.namespaces[await self.client.get_namespace_index(ns)] = ns
 
         root = self.client.get_root_node()
         self.logger.info("Starting to collect nodes. This may take some time ...")
-        self.iterater_over_child_nodes(root)
+        await self.start_node_browse(root)
         self.logger.info("All nodes collected")
 
-    def statistics(self):
-        types = {}
-        for node in self.nodes:
+    async def statistics(self):
+        self.logger.info("Calculating statistics")
+        typecounts_per_namespace = {}
+        nodecount = len(self.nodes)
+        bar = progressbar.ProgressBar()
+        for idx in bar(range(nodecount)):
+            node = self.nodes[idx]
             try:
-                node_class = str(node.get_node_class())
+                node_class = str(await node.read_node_class())
                 ns = node.nodeid.NamespaceIndex
-                if ns not in types:
-                    types[ns] = {}
-                if node_class not in types[ns]:
-                    types[ns][node_class] = 1
+                if ns not in typecounts_per_namespace:
+                    typecounts_per_namespace[ns] = {}
+                if node_class not in typecounts_per_namespace[ns]:
+                    typecounts_per_namespace[ns][node_class] = 1
                 else:
-                    types[ns][node_class] += 1
+                    typecounts_per_namespace[ns][node_class] += 1
             except Exception as e:
-                self.logger.info("some error with %s: %s" % (node,e))
+                self.logger.error("some error with %s: %s" % (node, e))
 
-        for ns in types:
+        for ns in typecounts_per_namespace:
             self.logger.info("NS%d (%s)" % (ns, self.namespaces[ns]))
-            for type in types[ns]:
-                self.logger.info("\t%s:\t%d" % (type, types[ns][type]))
+            for type_info in typecounts_per_namespace[ns]:
+                self.logger.info("\t%s:\t%d" % (type_info, typecounts_per_namespace[ns][type_info]))
         self.logger.info("\tTOTAL in namespace: %d" % len(self.nodes))
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARN)
-
+async def main():
     parser = argparse.ArgumentParser(
         description="Export Node XML from OPC UA server")
     parser.add_argument('serverUrl', help='Complete URL of the OPC UA server', default="opc.tcp://localhost:16664")
@@ -108,14 +123,22 @@ if __name__ == "__main__":
                         dest="namespaces",
                         action="append",
                         type=int,
-                        help='Export only the given namespace indizes. Multiple NS indizes can be specified. If not specified, export all nodes.')
-    parser.add_argument('outputFile',
+                        help='Export only the given namespace indexes. Multiple NS indexes can be specified. If not specified, export all nodes.')
+    parser.add_argument('outputFile',  default="nodes_output.xml",
                         help='Save exported nodes in specified XML file')
+    parser.add_argument('-u', '--username', default="", metavar='<username>', dest="username", help="Username to login on server")
+    parser.add_argument('-p', '--password', default="", metavar='<password>', dest="password", help="Password to login on server")
+    parser.add_argument('-v', '--values', default=False, metavar='<values>', dest="export_values", help="Export node values to nodeset")
     args = parser.parse_args()
 
     exporter = NodeXMLExporter()
-    exporter.import_nodes(server_url=args.serverUrl)
-    exporter.statistics()
-    exporter.export_xml(args.namespaces, args.outputFile)
+    await exporter.import_nodes(server_url=args.serverUrl, username=args.username, password=args.password)
+    await exporter.statistics()
+    await exporter.export_xml(args.namespaces, args.outputFile, args.export_values)
 
-    exporter.client.disconnect()
+    await exporter.client.disconnect()
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.WARN, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    asyncio.run(main())
